@@ -1,11 +1,6 @@
-Description of the files in the folder 'Images_matlab_87'
+Description of the files in the folder 'Functions'
 
 ##########################################################
-
-Folder: Wavelet_Density_Estimation_PV1997
-Description:
-Folder containing the functions used to estimate a density function
-using the method proposed by Pinheiro and Vidakovic (1997)
 
 File: smooth2d.m
 Description:
@@ -162,78 +157,4 @@ Performs a binning (histogram estimator) of the data on vx, and
 evaluates the estimated density function on the points on vpts. The
 length of the window used is fixed on wind.
 
-
-File: Forest_01.m
-Description:
-In this code we perform the following analyses:
-1 - We compute the wavelet decomposition of the images, then
-we estimate the density of the coefficients for each subband
-using binning, get this estimated density evaluated on
-some points and the take the 1D wavelet transform of these 
-points. For each subband, the time series of these points are
-used with the method in Fonseca and Pinheiro (2019) to
-estimate the dimension of the subspace gererating these densities.
-2 - We plot the time series densities of the subband's coefficients.
-3 - Use the estimated dimension of the subspace generating the
-densities to obtain estimates of these densities with the 
-estimated dimension, and then compute the MDDMs
-4 - test using the function wavedec2 instead of the swt2 to
-perform the 2D wavelet decomposition of the images. Also, in
-this part the functions used are adapted to consider different values of J.
-5 - in the last part, the mean image is computed, subtracted
-of all images, and then the MDDMs are computed for these normalized images.
-
-
-File: Forest_02.m
-Description:
-In this code we perform the following analyses:
-1 - we use the function 'DecompForestImageTS_swt2.m' to compute
-the wavelet coefficients of the 1D-DWT of the densities
-estimated for subbands obtained from the 2D-DWT of the images
-using the swt2 function of Matlab. Then we estimate the
-dimension of the subspace generating these densities.
-2 - a video is made with the plot of the estimated density
-function corresponding to each subband of the 2D-DWT of the
-images and each time point.
-3 - MDDMs are tested to be plotted in gray scale
-4 - using the estimated dimension of the subspace generating
-the densities, estimates of these densities are obtained
-and used to compute the MDDMs.
-5 - the mean image is computed, subtractedof all images, and 
-then the MDDMs are computed for these normalized images.
-
-
-File: Forest_03.m
-Description:
-In this code we perform the following analyses:
-1 - we plot the energy (sum of squared coefficients) on each level of a
-2D-DWT of the mean image. We look for the level where we can observe a
-expressive growth begins.
-2 - we compute the mean image, then we take logs, and test the MDDMs
-in the cases when normalization (subtract the mean) is performed in the
-images before smoothing and the case when smoothing is performed before
-normalization. The number of MDDMs depends on J, and is related for each
-detail subband generated
-3 - we identify the image that differs the most from all the others and the
-two most different time points
-4 - we make a video with the image time series
-
-
-File: Forest_04.m
-Description:
-1 - Here we test the idea of estimating the dimension of the subspace
-generating the density time series of wavelet coefficients, then using
-the densities estimated with the eigenfunctions and the dimension chosen
-to obtain residuals, which are employed to obtain a bootstrap
-distribution of the Hellinger distance under H0.
-2 - Here we make the same analysis as before, but also using the
-approximation coefficients.
-
-
-File: Rondonia_DimTS_01.m
-Description:
-In this code we analyze the time series of density functions obtained for
-each sub-region of the 2D wavelet decomposition of the images of
-Rondonia. After getting these time series, we estimate their dimension
-using the technique proposed in the paper Fonseca and Pinheiro (2019).
 
