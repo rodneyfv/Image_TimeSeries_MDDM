@@ -4,6 +4,7 @@ close all
 clear all
 
 addpath(genpath('Functions/'))
+addpath(genpath('SJS_WBEMR/'))
 
 SatImages = matfile('/media/rodney/Arquivos/Datasets/Abdou_87_Sattelite_Images/xSpatial_ySpatial_VH_VV_Time.mat');
 % SatImages.data is a matrix of dimension 4000x3000x2x87
@@ -14,7 +15,7 @@ SatImages = matfile('/media/rodney/Arquivos/Datasets/Abdou_87_Sattelite_Images/x
 idx = 1:1024;
 idy = 501:(500 + 1024);
 
-%img = SatImages.data(idx,idy,1,1);
+% img = SatImages.data(idx,idy,1,1);
 
 wname='sym8';
 %wname='db4';
@@ -31,6 +32,7 @@ npts = 512;
 % level of the 1D-DWT used for the equispaced values
 j1 = floor(log2(npts) - log2(log(npts))); % See Eq. (18) of PV1997
 [~,tmp,~] = wden(ones(npts,1),'sqtwolog','s','sln',j1,wname);
+% number of coefficients in the wavelet decomposition of the functions
 n_dec = length(tmp);
 
 % level chosen using the scalogram
@@ -51,6 +53,15 @@ for ii=1:n
     cTime{1}{ii} = datetime(tmp2(3:12),'InputFormat','yyyy-MM-dd');
     cTime{2}(ii) = month(cTime{1}{ii});
 end
+
+
+% plot of the first four images in the time series
+img = SatImages.data(idx,idy,1,1:4);
+subplot(2,2,1); imagesc(img(:,:,1)); title(char(cTime{1}{1}))
+subplot(2,2,2); imagesc(img(:,:,2)); title(char(cTime{1}{2}))
+subplot(2,2,3); imagesc(img(:,:,3)); title(char(cTime{1}{3}))
+subplot(2,2,4); imagesc(img(:,:,4)); title(char(cTime{1}{4}))
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Here we test the idea of estimating the dimension of the subspace
@@ -92,29 +103,6 @@ parfor t=1:n
 end
 
 
-% computing the MDDMs
-MDDM_A = zeros(n,n);
-MDDM_V = zeros(n,n,J);
-MDDM_H = zeros(n,n,J);
-MDDM_D = zeros(n,n,J);
-for k=1:(n-1)
-    for m=(k+1):n
-        MDDM_A(k,m) = norm(Xdec_A(:,k) - Xdec_A(:,m))/sqrt(2);
-        MDDM_A(m,k) = MDDM_A(k,m);
-        for jj=1:J
-            MDDM_H(k,m,jj) = norm(Xdec_H(:,jj,k) - Xdec_H(:,jj,m))/sqrt(2);
-            MDDM_H(m,k,jj) = MDDM_H(k,m,jj);
-            MDDM_V(k,m,jj) = norm(Xdec_V(:,jj,k) - Xdec_V(:,jj,m))/sqrt(2);
-            MDDM_V(m,k,jj) = MDDM_V(k,m,jj);
-            MDDM_D(k,m,jj) = norm(Xdec_D(:,jj,k) - Xdec_D(:,jj,m))/sqrt(2);
-            MDDM_D(m,k,jj) = MDDM_D(k,m,jj);
-        end
-    end    
-end
-
-imagesc(MDDM_A)
-imagesc(sum(MDDM_H + MDDM_V + MDDM_D,3))
-
 
 % estimating the dimension of the density time series for each sub-region
 % of the 2D decomposition of the images
@@ -138,82 +126,14 @@ end
 Xdec_hat_H = zeros(n_dec,J,n);
 Xdec_hat_V = zeros(n_dec,J,n);
 Xdec_hat_D = zeros(n_dec,J,n);
-% matrices of estimated Hellinger distances under H0, obtained from the 
-% difference between the observed densities and the estimated densities
-Hel_hat_A = zeros(1,n);
-Hel_hat_H = zeros(J,n);
-Hel_hat_V = zeros(J,n);
-Hel_hat_D = zeros(J,n);
 
 for jj=1:J
     % estimated density
     Xdec_hat_H(:,jj,:) = estimated_functions_Dim( reshape(Xdec_H(:,jj,:),[npts n]), p, vdim_H(jj) );
     Xdec_hat_V(:,jj,:) = estimated_functions_Dim( reshape(Xdec_V(:,jj,:),[npts n]), p, vdim_V(jj) );
     Xdec_hat_D(:,jj,:) = estimated_functions_Dim( reshape(Xdec_D(:,jj,:),[npts n]), p, vdim_D(jj) );
-    % residual obtained
-    for t=1:n
-        Hel_hat_H(jj,t) = norm(Xdec_H(:,jj,t) - Xdec_hat_H(:,jj,t));
-        Hel_hat_V(jj,t) = norm(Xdec_V(:,jj,t) - Xdec_hat_V(:,jj,t));
-        Hel_hat_D(jj,t) = norm(Xdec_D(:,jj,t) - Xdec_hat_D(:,jj,t));
-    end
 end
 Xdec_hat_A = estimated_functions_Dim( reshape(Xdec_A,[npts n]), p, dim_A );
-for t=1:n; Hel_hat_A(t) = norm(Xdec_A(:,t) - Xdec_hat_A(:,t)); end
-
-
-% here we use the residuals obtained to generate bootstrap samples of the
-% Hellinger distance under H0
-vMDDM_boot = randsample(sum(Hel_hat_H,1) + sum(Hel_hat_V,1) + sum(Hel_hat_D,1) + Hel_hat_A,1000,true);
-tmp = (sum(MDDM_H + MDDM_V + MDDM_D,3)+MDDM_A)>quantile(vMDDM_boot,.999);
-imagesc(tmp)
-imagesc(sum(MDDM_H + MDDM_V + MDDM_D,3) + MDDM_A)
-
-
-vMDDM_boot = randsample(Hel_hat_A,1000,true);
-tmp = MDDM_A>quantile(vMDDM_boot,.999);
-imagesc(tmp)
-imagesc(sum(MDDM_H + MDDM_V + MDDM_D,3))
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Here we perform the same analysis as Atto el at (2018), but the MDDM
-% spots are compared by running a Wilcoxon test on the MDDM's columns to
-% identify significantly different time points. Later, we perform the
-% wavelet estimation of functional dimension on each density time series,
-% and use the loadings to make a one-step ahead prediction of the density
-% for each subband on the 2D decomposition.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% computing the mean image
-img_mean = zeros(length(idx), length(idy));
-for t=1:5:86
-    % we compute directly the sum of five images each time
-    if t<=85
-        img = SatImages.data(idx,idy,1,t:(t+4));
-        img_mean = img_mean + sum(img,4)./n;
-    else
-        img = SatImages.data(idx,idy,1,t:n);
-        img_mean = img_mean + sum(img,4)./n;        
-    end
-end
-
-
-% arrays with wavelet coefficients of densities for each of the J details
-Xdec_A = zeros(n_dec,n);
-Xdec_H = zeros(n_dec,J,n);
-Xdec_V = zeros(n_dec,J,n);
-Xdec_D = zeros(n_dec,J,n);
-parfor jj=1:2 % initiating the parfor
-    tmp = 0;
-end
-parfor t=1:n
-    %SatImages = matfile('/media/rodney/Arquivos/Datasets/Abdou_87_Sattelite_Images/xSpatial_ySpatial_VH_VV_Time.mat');
-    % changing the current boundary to periodic.
-    dwtmode('per','nodisp');
-    % Normalizing the log-images before performing the thresholding
-    mS = log(SatImages.data(idx,idy,1,t) + 1) - log(img_mean + 1);
-    [Xdec_A(:,t), Xdec_H(:,:,t), Xdec_V(:,:,t), Xdec_D(:,:,t), ~] = FullDecompImageTS_wavedec2( mS, J, wname, npts, j1 );
-end
 
 
 % computing the MDDMs
@@ -223,31 +143,30 @@ MDDM_H = zeros(n,n,J);
 MDDM_D = zeros(n,n,J);
 for k=1:(n-1)
     for m=(k+1):n
-        MDDM_A(k,m) = norm(Xdec_A(:,k) - Xdec_A(:,m))/sqrt(2);
+        MDDM_A(k,m) = norm(Xdec_hat_A(:,k) - Xdec_hat_A(:,m))/sqrt(2);
         MDDM_A(m,k) = MDDM_A(k,m);
         for jj=1:J
-            MDDM_H(k,m,jj) = norm(Xdec_H(:,jj,k) - Xdec_H(:,jj,m))/sqrt(2);
+            MDDM_H(k,m,jj) = norm(Xdec_hat_H(:,jj,k) - Xdec_hat_H(:,jj,m))/sqrt(2);
             MDDM_H(m,k,jj) = MDDM_H(k,m,jj);
-            MDDM_V(k,m,jj) = norm(Xdec_V(:,jj,k) - Xdec_V(:,jj,m))/sqrt(2);
+            MDDM_V(k,m,jj) = norm(Xdec_hat_V(:,jj,k) - Xdec_hat_V(:,jj,m))/sqrt(2);
             MDDM_V(m,k,jj) = MDDM_V(k,m,jj);
-            MDDM_D(k,m,jj) = norm(Xdec_D(:,jj,k) - Xdec_D(:,jj,m))/sqrt(2);
+            MDDM_D(k,m,jj) = norm(Xdec_hat_D(:,jj,k) - Xdec_hat_D(:,jj,m))/sqrt(2);
             MDDM_D(m,k,jj) = MDDM_D(k,m,jj);
         end
     end    
 end
 
-% plotting the sum of the MDDMs with some dates on the x-axis
-imagesc(sum(MDDM_H + MDDM_V + MDDM_D,3) + MDDM_A)
+imagesc(MDDM_A + sum(MDDM_H + MDDM_V + MDDM_D,3))
+
+% x-axis labels with image dates
 tmp = cTime{1};
 for ii=1:n
-    if(mod(ii,15)==0||ii==2||ii==n)
+    if(mod(ii,30)==0||ii==2||ii==n)
         tmp{ii} = char(tmp{ii});
     else
         tmp{ii} = '';
     end
 end
-set(gca,'xtick',[1:n],'xticklabel',tmp)
-
 
 % matrix with p-values of the Wilcoxon test of the null hypothesis that two
 % paired vectors come from a distribution with the same medians. Since
@@ -262,7 +181,122 @@ for k=1:(n-1)
     end    
 end
 imagesc(mPval<1.0e-10)
+set(gca,'xtick',[1:n],'xticklabel',tmp)
 
+
+% plot of the MDDM and the test results for significantly different time
+% points
+subplot(1,2,1)
+imagesc(MDDM_A + sum(MDDM_H + MDDM_V + MDDM_D,3))
+colorbar
+subplot(1,2,2)
+imagesc(mPval<1.0e-10)
+
+% getting the indexes of the time points with largest numbers of
+% significant differences in the MDDM
+[tmp1,tmp2] = sort(sum((mPval<1.0e-10),1),'descend');
+tmp2(1:10)
+
+img = SatImages.data(idx,idy,1,tmp2(1:6));
+subplot(2,2,1); imagesc(img(:,:,1)); title(char(cTime{1}{1}))
+subplot(2,2,2); imagesc(img(:,:,2)); title(char(cTime{1}{2}))
+
+% Plotting the images that were detected as different most of the times
+img = zeros(1024,1024,6);
+tmp = tmp2(1:6);
+for ii=1:6
+    img(:,:,ii) = SatImages.data(idx,idy,1,tmp(ii));
+end
+
+img_mean_similarimages = (n*img_mean - sum(img,3))./81;
+subplot(2,2,1); imagesc(img(:,:,1)); title('66 :  20-Mar-2017')
+subplot(2,2,2); imagesc(img(:,:,2)); title('1 : 12-May-2015')
+subplot(2,2,3); imagesc(img(:,:,3)); title('44 : 06-Jun-2017')
+subplot(2,2,4); imagesc(img_mean); title('Mean image')
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Here we apply the method of Montoril et al (2019) for the unidimensional
+% time series of loadings estimated above. For each time series, a mixture
+% function is estimate, were we can observe which points seem to be 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% obtaining the wavelet coefficients of the eigenfunctions and their
+% respective loadings
+cEigFunc_H = {}; cLoadings_H = {};
+cEigFunc_V = {}; cLoadings_V = {};
+cEigFunc_D = {}; cLoadings_D = {};
+[ ~, cEigFunc_A, cLoadings_A ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_A,[n_dec n]), p, Nboot, alpha, dim_A);
+for jj=1:J
+    [ ~, cEigFunc_H{jj}, cLoadings_H{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_H(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_H(jj));
+    [ ~, cEigFunc_V{jj}, cLoadings_V{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_V(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_V(jj));
+    [ ~, cEigFunc_D{jj}, cLoadings_D{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_D(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_D(jj));
+end
+
+% Arguments
+s = 1;
+delt = 1e-4; % Length of the sub-intervals in the Trapezoidal rule.
+min_pts = 2; % min_pts corresponds to the minimum number of sub-interval less one in the Trapezoidal rule.
+wJ = ceil(.75*log2(n)); % Considering the resolution level 6
+wfilt = [0.027333068345164, 0.029519490926073,-0.039134249302583,...
+         0.199397533976996, 0.723407690403808, 0.633978963456949,...
+         0.016602105764424,-0.175328089908107,-0.021101834024930,...
+         0.019538882735387]; %Daubechies Least Asymmetric 10-tap wavelet filter called wfilter
+wprec = 30;
+
+% We consider as the time of observation a grid of points in the unit
+% interval
+x = (1:n)/n; 
+
+% estimating the mixture function for approximation loadings
+tmp = zeros(sum(dim_A), n);
+cont = 1;
+for ii=1:dim_A
+    tmp(cont,:) = mixtureProbs(cLoadings_A(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec);
+    cont = cont + 1;
+end
+% mean mixture function estimated
+vMixtureProbs_A = mean(tmp,1);
+
+% estimating the mixture function for detail loadings separately for each
+% detail level
+mMixtureProbs_details = zeros(J,n);
+for jj=1:J
+    tmp = zeros(sum(vdim_H(jj) + vdim_V(jj) + vdim_D(jj)), n);
+    cont = 1;
+    for ii=1:vdim_H(jj)
+        tmp(cont,:) = mixtureProbs(cLoadings_H{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec);
+        cont = cont + 1;
+    end    
+    for ii=1:vdim_V(jj)
+        tmp(cont,:) = mixtureProbs(cLoadings_V{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec);
+        cont = cont + 1;
+    end    
+    for ii=1:vdim_D(jj)
+        tmp(cont,:) = mixtureProbs(cLoadings_D{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec);
+    end
+    mMixtureProbs_details(jj,:) = mean(tmp,1);
+end
+
+% plot of the estimated mixture function of loadings corresponding to
+% approximation coefficients and detail coefficients in different levels
+plot(1:n,vMixtureProbs_A)
+plot(1:n,mMixtureProbs_details)
+
+
+tmp1 = mean([vMixtureProbs_A; mMixtureProbs_details(1,:)],1);
+plot(1:n,tmp1)
+xlabel('t')
+ylabel('\rho(t)')
+
+[~,tmp2] = sort(tmp1,'descend');
+tmp2(1:10)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Here , we perform the
+% wavelet estimation of functional dimension on each density time series,
+% and use the loadings to make a one-step ahead prediction of the density
+% for each subband on the 2D decomposition.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % arrays to store the mean coefficients of each month
 mMonthMean_A = zeros(n_dec,12);
@@ -341,16 +375,8 @@ end
 % We regress the loadings on their lagged values
 [mBetaEta,mSigmaEta,mResEta,mCovB,~] = mvregress([cLoadings_A(3:(n-1),1:dim_A) cLoadings_A(2:(n-2),1:dim_A) cLoadings_A(1:(n-3),1:dim_A)],...
     cLoadings_A(4:n,1:dim_A));
-% Results for mEta1
-% The colums have the estimates, standard values, Z-statists and p-values,
-% respectively
-[mBetaEta(:,1), sqrt(diag(mCovB)),...
-    mBetaEta(:,1)./sqrt(diag(mCovB)), 2*normcdf(-abs(mBetaEta(:,1))./sqrt(diag(mCovB)))]
-% F-statistic and p-value for the model of mEta1
-((n-3-3)/3)*(sum(cLoadings_A(4:n,1).^2) - sum(mResEta(:,1).^2))/sum(mResEta(:,1).^2)
-fcdf(((n-3-3)/3)*(sum(cLoadings_A(4:n,1).^2) - sum(mResEta(:,1).^2))/sum(mResEta(:,1).^2), 3, (n-3-3), 'upper')
 % one-step-ahead prediction for the loadings
-[cLoadings_A(n,1) cLoadings_A((n-1),1) cLoadings_A((n-2),1)]*mBetaEta
+[cLoadings_A(n,1:dim_A) cLoadings_A((n-1),1:dim_A) cLoadings_A((n-2),1:dim_A)]*mBetaEta
 
 % Now we compute one-step ahead prediction of the density for each subband
 % of the 2D wavelet decomposition
@@ -361,7 +387,7 @@ pred_Loadings_D = {};
 % Fitting a VAR(3) model and predicting loadings of approximation
 [mBetaEta,mSigmaEta,mResEta,mCovB,~] = mvregress([cLoadings_A(3:(n-1),1:dim_A) cLoadings_A(2:(n-2),1:dim_A) cLoadings_A(1:(n-3),1:dim_A)],...
     cLoadings_A(4:n,1:dim_A));
-pred_Loadings_A = [cLoadings_A(n,1) cLoadings_A((n-1),1) cLoadings_A((n-2),1)]*mBetaEta;
+pred_Loadings_A = [cLoadings_A(n,1:dim_A) cLoadings_A((n-1),1:dim_A) cLoadings_A((n-2),1:dim_A)]*mBetaEta;
 for jj=1:J
     % horizontal coefficients
     [mBetaEta,mSigmaEta,mResEta,mCovB,~] = mvregress([cLoadings_H{jj}(3:(n-1),1:vdim_H(jj)) cLoadings_H{jj}(2:(n-2),1:vdim_H(jj)) cLoadings_H{jj}(1:(n-3),1:vdim_H(jj))],...
@@ -383,11 +409,11 @@ end
 pred_Xdec_H = zeros(n_dec,J);
 pred_Xdec_V = zeros(n_dec,J);
 pred_Xdec_D = zeros(n_dec,J);
-pred_Xdec_A = cEigFunc_A*pred_Loadings_A + mMonthMean_A(:,12);
+pred_Xdec_A = cEigFunc_A*pred_Loadings_A' + mMonthMean_A(:,12);
 for jj=1:J
-    pred_Xdec_H(:,jj) = cEigFunc_H{jj}*pred_Loadings_H{jj} + mMonthMean_H(:,jj,12);
-    pred_Xdec_V(:,jj) = cEigFunc_V{jj}*pred_Loadings_V{jj} + mMonthMean_V(:,jj,12);
-    pred_Xdec_D(:,jj) = cEigFunc_D{jj}*pred_Loadings_D{jj} + mMonthMean_D(:,jj,12);
+    pred_Xdec_H(:,jj) = cEigFunc_H{jj}*pred_Loadings_H{jj}' + mMonthMean_H(:,jj,12);
+    pred_Xdec_V(:,jj) = cEigFunc_V{jj}*pred_Loadings_V{jj}' + mMonthMean_V(:,jj,12);
+    pred_Xdec_D(:,jj) = cEigFunc_D{jj}*pred_Loadings_D{jj}' + mMonthMean_D(:,jj,12);
 end
 
 % comparing the Hellinger distance of observed values with the predited
@@ -406,84 +432,8 @@ for k=1:n
 end
 % plot of the differences
 plot(pred_MDDM_A + sum(pred_MDDM_H + pred_MDDM_V + pred_MDDM_D,2))
+xlabel('time')
+ylabel('Hellinger distance with predicted densities')
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Here we run an idea similar to a moving average, where we consider as
-% observed images the average of three consecutive images, then we run the
-% usual MDDM analysis with Wilcoxon test of the columns corresponding to
-% different time points
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% computing the mean image
-img_mean = zeros(length(idx), length(idy));
-for t=1:5:86
-    % we compute directly the sum of five images each time
-    if t<=85
-        img = SatImages.data(idx,idy,1,t:(t+4));
-        img_mean = img_mean + sum(img,4)./n;
-    else
-        img = SatImages.data(idx,idy,1,t:n);
-        img_mean = img_mean + sum(img,4)./n;        
-    end
-end
-
-% since we analazy the average of three images, the sample size will
-% decrease by 2
-n = 85;
-% arrays with wavelet coefficients of densities for each of the J details
-Xdec_A = zeros(n_dec,n);
-Xdec_H = zeros(n_dec,J,n);
-Xdec_V = zeros(n_dec,J,n);
-Xdec_D = zeros(n_dec,J,n);
-parfor jj=1:2 % initiating the parfor
-    tmp = 0;
-end
-parfor t=1:n
-    %SatImages = matfile('/media/rodney/Arquivos/Datasets/Abdou_87_Sattelite_Images/xSpatial_ySpatial_VH_VV_Time.mat');
-    % changing the current boundary to periodic.
-    dwtmode('per','nodisp');
-    im = SatImages.data(idx,idy,1,t:(t+2));
-    % Normalizing the log-images before performing the thresholding
-    mS = log(sum(im,4)/3 + 1) - log(img_mean + 1);
-    [Xdec_A(:,t), Xdec_H(:,:,t), Xdec_V(:,:,t), Xdec_D(:,:,t), ~] = FullDecompImageTS_wavedec2( mS, J, wname, npts, j1 );
-end
-
-
-% computing the MDDMs
-MDDM_A = zeros(n,n);
-MDDM_V = zeros(n,n,J);
-MDDM_H = zeros(n,n,J);
-MDDM_D = zeros(n,n,J);
-for k=1:(n-1)
-    for m=(k+1):n
-        MDDM_A(k,m) = norm(Xdec_A(:,k) - Xdec_A(:,m))/sqrt(2);
-        MDDM_A(m,k) = MDDM_A(k,m);
-        for jj=1:J
-            MDDM_H(k,m,jj) = norm(Xdec_H(:,jj,k) - Xdec_H(:,jj,m))/sqrt(2);
-            MDDM_H(m,k,jj) = MDDM_H(k,m,jj);
-            MDDM_V(k,m,jj) = norm(Xdec_V(:,jj,k) - Xdec_V(:,jj,m))/sqrt(2);
-            MDDM_V(m,k,jj) = MDDM_V(k,m,jj);
-            MDDM_D(k,m,jj) = norm(Xdec_D(:,jj,k) - Xdec_D(:,jj,m))/sqrt(2);
-            MDDM_D(m,k,jj) = MDDM_D(k,m,jj);
-        end
-    end    
-end
-
-imagesc(sum(MDDM_H + MDDM_V + MDDM_D,3)+MDDM_A)
-
-% matrix with p-values of the Wilcoxon test of the null hypothesis that two
-% paired vectors come from a distribution with the same medians. Since
-% multiple tests are being made, we set a low critical value for the
-% p-values
-mMDDMsum = sum(MDDM_H + MDDM_V + MDDM_D,3)+MDDM_A;
-mPval = ones(size(mMDDMsum));
-for k=1:(n-1)
-    for m=(k+1):n
-        mPval(k,m) = ranksum(mMDDMsum(:,k),mMDDMsum(:,m));
-        mPval(m,k) = mPval(k,m);
-    end    
-end
-imagesc(mPval<1.0e-10)
 
