@@ -130,7 +130,8 @@ Xdec_hat_A = estimated_functions_Dim( reshape(Xdec_A,[npts n]), p, dim_A );
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Here we apply the method of Montoril et al (2019) for the unidimensional
 % time series of loadings estimated above. For each time series, a mixture
-% function is estimate, were we can observe which points seem to be 
+% function is estimated, were we can observe which points seem to be
+% significantly different
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % obtaining the wavelet coefficients of the eigenfunctions and their
@@ -146,7 +147,7 @@ for jj=1:J
 end
 
 % Arguments
-s = 1;
+s = 1; % Value used to define the intervals
 delt = 1e-4; % Length of the sub-intervals in the Trapezoidal rule.
 min_pts = 2; % min_pts corresponds to the minimum number of sub-interval less one in the Trapezoidal rule.
 wJ = ceil(.75*log2(n)); % Considering the resolution level 6
@@ -154,7 +155,7 @@ wfilt = [0.027333068345164, 0.029519490926073,-0.039134249302583,...
          0.199397533976996, 0.723407690403808, 0.633978963456949,...
          0.016602105764424,-0.175328089908107,-0.021101834024930,...
          0.019538882735387]; %Daubechies Least Asymmetric 10-tap wavelet filter called wfilter
-wprec = 30;
+wprec = 30; % number of Daubechies-Lagarias steps
 
 % We consider as the time of observation a grid of points in the unit
 % interval
@@ -208,7 +209,7 @@ ylabel('\rho(t)')
 
 [vC,mL] = wavedec2(img_mean,J,wname);
 n_C = length(vC);
-% matrix to keep the 2D DWT of the imaeges
+% matrix to keep the 2D DWT of the images
 mDWT2D_TS = zeros(n,n_C);
 parfor jj=1:2; end
 parfor t=1:n
@@ -225,20 +226,20 @@ parfor t=1:n
     [mDWT2D_TS(t,:),~] = wavedec2(mG,J,wname);
 end
 
-% indexes of the coefficients whose time series we'll analyze
-% vC_ids = round(linspace(1,n_C,500));
-vC_ids = 1:100;
+% Indexes of the coefficients whose time series we'll analyze.
+% prod(mL(1,:)) is the number of approximation coefficients in the 2D-DWT,
+% and the coefficients we take below correspond to them
+vC_ids = 1:prod(mL(1,:));
 % matrix that keeps the mixture function of each wavelet coefficient
 mMixtureFuncCoef = zeros(n,length(vC_ids));
 % vector to keep the norm of the difference of each coefficient mixture
 % function with the mean mixture function computed for the whole time
-% seires
+% series
 vNormDiff_C = zeros(length(vC_ids),1);
 tic
-% parfor jj=1:2; end
 for ii=1:length(vC_ids)
    mMixtureFuncCoef(:,ii) = mixtureProbs(mDWT2D_TS(:,vC_ids(ii)), x, s, delt, min_pts, wJ, wfilt, wprec); 
-   vNormDiff_C(ii) = sum((mMixtureFuncCoef(:,ii) - vMeanMixtureFunc').^4)^(1/4);
+   vNormDiff_C(ii) = norm(mMixtureFuncCoef(:,ii) - vMeanMixtureFunc');
    %fprintf('ii=%i\n',ii)
 end
 toc
@@ -251,68 +252,73 @@ plot(mMixtureFuncCoef(:,tmp2))
 hold on
 plot(vMeanMixtureFunc)
 
-% identifying the pixels related to the coefficients with lowest values of
-% norm difference
+% identifying the pixels related to the 10 coefficients with lowest values
+% of norm difference
 [tmp1, tmp2] = sort(vNormDiff_C,'ascend');
 vC = zeros(n_C,1);
 vC(vC_ids(tmp2(1:10))) = 1;
 tmp = waverec2(vC,mL,wname);
-% plotting these points in the
+% plotting these points above the mean image
 imshow(img_mean)
 hold on
 [tmp1, tmp2] = find(abs(tmp)>.01);
 plot(tmp2, tmp1, 'r*', 'LineWidth', .1, 'MarkerSize', .1);
+
+% Making a video where we plot the change regions chaging while we change
+% the proportion of used lowest norms corresponding to approximation
+% coefficients.
+% create the video writer with 1 fps
+writer_im = VideoWriter('ChangingRegions.avi');
+% number of frames shown in a second
+writer_im.FrameRate = 1;
+% open the video writer
+open(writer_im);
+% write the frames to the video
+imshow(img_mean) % plotting the mean image for reference
+hold on
+for t = round(linspace(1,256,20))
+    [tmp1, tmp2] = sort(vNormDiff_C,'ascend');
+    vC = zeros(n_C,1);
+    vC(vC_ids(tmp2(1:t))) = 1;
+    tmp = waverec2(vC,mL,wname);
+    % plotting these points above the mean image
+    [tmp1, tmp2] = find(abs(tmp)>.01);
+    plot(tmp2, tmp1, 'r*', 'LineWidth', .1, 'MarkerSize', .1);
+    title(sprintf('%d%%',round(100*t/256))) 
+    frame = getframe(gcf);
+    writeVideo(writer_im, frame);    
+end
+% close the writer object
+close(writer_im);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % making a video with the image time series
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-mS = log(SatImages.data(idx,idy,1,t) + 1) - log(img_mean + 1);
-[~,~,~,~, mL] = FullDecompImageTS_wavedec2( mS, J, wname, npts, j1 );
-vpts = linspace(-0.5,0.5,npts);
-
 % create the video writer with 1 fps
-writer_im = VideoWriter('approx-densties.avi');
+writer_im = VideoWriter('ForestTS.avi');
 % number of frames shown in a second
-writer_im.FrameRate = 2;
+writer_im.FrameRate = 1;
 % open the video writer
 open(writer_im);
 % write the frames to the video
-for t = 1:87
-    % getting the density estimated at time t in the approximation subband
-    sqrtdens1 = waverec(Xdec_hat_A(:,t),mL,wname);
-    % plotting the densities
-    plot(vpts,sqrtdens1.^2,'LineWidth',.5), set(gca,'FontSize',5)
-    ylim([0 .85])
-    title(sprintf('t=%d',t))
-    frame = getframe(gcf) ;
+for t = 2:87
+    % changing the current boundary to periodic.
+    dwtmode('per','nodisp');
+    % Normalizing the log-images before performing the thresholding
+    mS = log(SatImages.data(idx,idy,1,t) + 1);
+    
+    % smoothing the image using 2D wavelet denoising
+    [thr,~,~] = ddencmp('cmp','wp',mS);
+    mG = wdencmp('gbl',mS,'db6',6,thr*2,'s',1);
+    
+    imshow(exp(mG) - 1)
+    title(sprintf('%c',char(cTime{1}{t})))
+    frame = getframe(gcf);
     writeVideo(writer_im, frame);    
 end
 % close the writer object
 close(writer_im);
-
-tmp = flip(1:J);
-for jj=1:J
-    % create the video writer with 1 fps
-    writer_im = VideoWriter(sprintf('V%i-densties.avi',tmp(jj)));
-    % number of frames shown in a second
-    writer_im.FrameRate = 2;
-    % open the video writer
-    open(writer_im);
-    % write the frames to the video
-    for t = 2:87
-        % getting the density estimated at time t in a detail subband
-        sqrtdens1 = waverec(Xdec_hat_V(:,jj,t),mL,wname);
-        % plotting the densities
-        plot(vpts,sqrtdens1.^2,'LineWidth',.5)
-        set(gca,'FontSize',5)
-        ylim([0 20]),title(sprintf('t=%d',t))
-        frame = getframe(gcf);
-        writeVideo(writer_im, frame);    
-    end
-    % close the writer object
-    close(writer_im);    
-end
 
 
