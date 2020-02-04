@@ -1,4 +1,4 @@
-function [ fEfr1 ] = mixtureProbs(y, x, s, delt, min_pts, wJ, wfilt, wprec)
+function [ fHat ] = mixtureProbs(y, x, s, delt, min_pts, wJ, wfilt, wprec, rawest, estimator)
 %
 % Description
 % This function is used to apply the method of Montoril et al (2019) in the
@@ -31,20 +31,65 @@ muL = mean(y(y<=tmp));
 % Applying the transformation to take the problem to a regression context
 w = (y - muL)/(muG - muL);
 
-% Obtaining the raw scaling coefficient estimates
-% We need to use a row vector in the function below
-[w1, ~] = WavCoefEsts(w', x, s, delt, min_pts, wJ, wfilt, wprec);
+% Obtaining the raw scaling coefficient estimates. If the user sets rawest
+% as 'wavcoefint', the raw estimator of Montoril et al (2019) that uses
+% numerical integration is employed, otherwise the method presented in 
+% their equation (8) is used.
+if(strcmp(rawest,'wavcoefint'))
+    % We need to use a row vector in the function below.
+    % Raw estimator of equation (9) in Montoril et al (2019)
+    [~, w1] = WavCoefEsts(w', x, s, delt, min_pts, wJ, wfilt, wprec);
+elseif(strcmp(rawest,'wavcoef'))
+    % Raw estimator of equation (8) in Montoril et al (2019)
+    [w1,~] = WavCoefEsts(w', x, s, delt, min_pts, wJ, wfilt, wprec);
+else
+    error('Raw estimator not defined correctly')
+end
 
 % Decomposing the raw estimates into wavelet domain
 [wd1, snoise1] = wd(w1, 0, wfilt, true);
 
-% Shrinkage using Efromovich's approach
-[rwdEfr1, Jest1, ~] = WavShrink(wd1, wfilt, true, 'Efromovich', true, snoise1);
-
-% Function estimates regularized by Efromovich's shrinkage
-yy1 = PHI(x, Jest1, wfilt, wprec, true);
-fEfr1 = yy1*rwdEfr1';
-fEfr1(fEfr1<0) = 0;fEfr1(fEfr1>1) = 1;
-
+if strcmp(estimator,'HardThresh')
+    % Decomposing the raw estimates into wavelet domain
+    [wd1, snoise1] = wd(w1, 0, wfilt, true);
+    wdH1 = wd1(1:2^wJ);
+    % Obtaining the raw function estimates
+    yy = PHI(x, wJ, wfilt, wprec, true);
+    % Shrinkage using hard threshold
+    rwdH1 = WavShrink(wdH1, wfilt, true, 'Hard', true, snoise1);
+    % Function estimates regularized by Hard threshold
+    fHat = yy*rwdH1';
+    fHat(fHat<0) = 0;
+    fHat(fHat>1) = 1;
+    
+elseif strcmp(estimator,'Efromovich')
+    % Shrinkage using Efromovich's approach
+    [rwdEfr1, Jest1, ~] = WavShrink(wd1, wfilt, true, 'Efromovich', true, snoise1);
+    % Function estimates regularized by Efromovich's shrinkage
+    yy1 = PHI(x, Jest1, wfilt, wprec, true);
+    fHat = yy1*rwdEfr1';
+    fHat(fHat<0) = 0; fHat(fHat>1) = 1;  
+    
+elseif strcmp(estimator,'LocLinReg')
+    % Obtaining the raw function estimates
+    yy = PHI(x, wJ, wfilt, wprec, true);
+    f1row1 = yy*w1';
+    % Function estimates regularized by Local Linear Regression
+    % bandwidth used in the ksrlin function
+    r.n=length(x);
+    hx=median(abs(x-median(x)))/0.6745*(4/3/r.n)^0.2;
+    hy=median(abs(f1row1-median(f1row1)))/0.6745*(4/3/r.n)^0.2;
+    h=sqrt(hy*hx);
+    % the fourth argument in ksrlin indicates we want the results in n
+    % points
+    r1=ksrlin(x,f1row1,h,r.n);
+    r1.f(r1.f<0) = 0;
+    r1.f(r1.f>1) = 1;
+    fHat = r1.f;
+    
+else
+    error('Estimation method not defined correctly')
+end
+    
 end
 

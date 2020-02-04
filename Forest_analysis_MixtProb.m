@@ -165,7 +165,7 @@ x = (1:n)/n;
 tmp = zeros(sum(dim_A), n);
 cont = 1;
 for ii=1:dim_A
-    tmp(cont,:) = mixtureProbs(cLoadings_A(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec);
+    tmp(cont,:) = mixtureProbs(cLoadings_A(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,'wavcoefint');
     cont = cont + 1;
 end
 % mean mixture function estimated
