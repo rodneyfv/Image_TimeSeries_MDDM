@@ -17,9 +17,12 @@ function [ fHat ] = mixtureProbs(y, x, s, delt, min_pts, wJ, wfilt, wprec, rawes
 % wfilt     - Scaling wavelet filter.
 % wprec       - Precision approximation measured by the number of
 %                   Daubechies-Lagarias steps.
-%
+% rawest      - Type of raw estimator. If 'wavcoef', Eq. (8) of Montoril et
+%           al (2019) is used, or if 'wavcoefint', their Eq. (9) is used.
+% estimator   - Type off estimator, which can be 'HardThresh',
+%           'Efromovich', or 'LocLinReg'.
 % Outputs
-% fEfr1       - function with the probability of each point belong to the
+% fHat       - function with the probability of each point belong to the
 %                first group
 
 % threshold used to separate the observations in y in two groups

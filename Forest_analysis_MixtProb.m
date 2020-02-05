@@ -160,12 +160,14 @@ wprec = 30; % number of Daubechies-Lagarias steps
 % We consider as the time of observation a grid of points in the unit
 % interval
 x = (1:n)/n; 
+rawest = 'wavcoefint';
+estimator = 'LocLinReg';
 
 % estimating the mixture function for approximation loadings
 tmp = zeros(sum(dim_A), n);
 cont = 1;
 for ii=1:dim_A
-    tmp(cont,:) = mixtureProbs(cLoadings_A(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,'wavcoefint');
+    tmp(cont,:) = mixtureProbs(cLoadings_A(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
     cont = cont + 1;
 end
 % mean mixture function estimated
@@ -178,15 +180,15 @@ for jj=1:J
     tmp = zeros(sum(vdim_H(jj) + vdim_V(jj) + vdim_D(jj)), n);
     cont = 1;
     for ii=1:vdim_H(jj)
-        tmp(cont,:) = mixtureProbs(cLoadings_H{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec);
+        tmp(cont,:) = mixtureProbs(cLoadings_H{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
         cont = cont + 1;
     end    
     for ii=1:vdim_V(jj)
-        tmp(cont,:) = mixtureProbs(cLoadings_V{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec);
+        tmp(cont,:) = mixtureProbs(cLoadings_V{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
         cont = cont + 1;
     end    
     for ii=1:vdim_D(jj)
-        tmp(cont,:) = mixtureProbs(cLoadings_D{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec);
+        tmp(cont,:) = mixtureProbs(cLoadings_D{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
     end
     mMixtureProbs_details(jj,:) = mean(tmp,1);
 end
@@ -238,7 +240,7 @@ mMixtureFuncCoef = zeros(n,length(vC_ids));
 vNormDiff_C = zeros(length(vC_ids),1);
 tic
 for ii=1:length(vC_ids)
-   mMixtureFuncCoef(:,ii) = mixtureProbs(mDWT2D_TS(:,vC_ids(ii)), x, s, delt, min_pts, wJ, wfilt, wprec); 
+   mMixtureFuncCoef(:,ii) = mixtureProbs(mDWT2D_TS(:,vC_ids(ii)), x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator); 
    vNormDiff_C(ii) = norm(mMixtureFuncCoef(:,ii) - vMeanMixtureFunc');
    %fprintf('ii=%i\n',ii)
 end
@@ -275,16 +277,18 @@ writer_im.FrameRate = 1;
 open(writer_im);
 % write the frames to the video
 imshow(img_mean) % plotting the mean image for reference
-hold on
 for t = round(linspace(1,256,20))
     [tmp1, tmp2] = sort(vNormDiff_C,'ascend');
     vC = zeros(n_C,1);
     vC(vC_ids(tmp2(1:t))) = 1;
     tmp = waverec2(vC,mL,wname);
+    imshow(img_mean) % plotting the mean image for reference
+    hold on
     % plotting these points above the mean image
     [tmp1, tmp2] = find(abs(tmp)>.01);
     plot(tmp2, tmp1, 'r*', 'LineWidth', .1, 'MarkerSize', .1);
     title(sprintf('%d%%',round(100*t/256))) 
+    hold off
     frame = getframe(gcf);
     writeVideo(writer_im, frame);    
 end
