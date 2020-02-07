@@ -303,7 +303,7 @@ close(writer_im);
 % create the video writer with 1 fps
 writer_im = VideoWriter('ForestTS.avi');
 % number of frames shown in a second
-writer_im.FrameRate = 1;
+writer_im.FrameRate = 6;
 % open the video writer
 open(writer_im);
 % write the frames to the video
