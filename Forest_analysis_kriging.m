@@ -60,14 +60,94 @@ end
 % performed
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% making a loop to generate txt files that will be used in R to run a
-% spatial model in the images
-for ii=1:87
-    img = log(SatImages.data(idx,idy,1,ii) + 1);
-    dlmwrite(sprintf( 'ImagesTStxt/image-%i.txt',ii),img);
+% % making a loop to generate txt files that will be used in R to run a
+% % spatial model in the images
+% for ii=1:87
+%     img = log(SatImages.data(idx,idy,1,ii) + 1);
+%     dlmwrite(sprintf( 'ImagesTStxt/image-%i.txt',ii),img);
+% end
+% 
+% % and this is how we can read a treated image
+% img2 = dlmread('imagehs-1.txt');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plotting the ACFs of the pixels time series from images smoothed with
+% kriging
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+imagesTS = zeros(512,512,n);
+for t=1:87
+    % reading the (log) image smoothed with kriging
+    imagesTS(:,:,t) = dlmread(fullfile(pwd(),'..','Images_TimeSeries_files/ImagesHatTS',sprintf('imagehs-%i.txt',t)));
 end
 
-% and this is how we can read a treated image
-img2 = dlmread('imagehs-1.txt');
+% estimating the autocorrelation function of the pixel time series
+acfsTS = zeros(512,512,21);
+vMeanACF = zeros(21,1);  % mean of autocorrelation functions
+for ii=1:512
+    for jj=1:512
+        acfsTS(ii,jj,:) = autocorr(imagesTS(ii,jj,:));
+        vMeanACF = vMeanACF + squeeze(acfsTS(ii,jj,:));
+    end
+    if mod(round(100*ii/512),20)==0;fprintf('%d%%,',round(100*ii/512));end
+end
+vMeanACF = vMeanACF./(512*512);
+
+% ploting some autocorrelation functions together with the mean in a
+% different color
+plot(squeeze(acfsTS(1,1,:)),'b')
+ylim([-.6 1])
+hold on
+tic
+for ii=round(linspace(1,512,50))
+    for jj=round(linspace(1,512,50))
+        plot(squeeze(acfsTS(ii,jj,:)),'b')
+    end
+end
+toc
+plot(vMeanACF,'r','LineWidth',2)
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plotting the ACFs of the pixels time series from the difference of images
+% smoothed with kriking and the observed images, that is, of noise images
+% time series
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+NoiseTS = zeros(512,512,n);
+for t=1:87
+    % image smoothed with kriking
+    imgsm = dlmread(fullfile(pwd(),'..','Images_TimeSeries_files/ImagesHatTS',sprintf('imagehs-%i.txt',t)));
+    % raw (log) image
+    imgraw = dlmread(fullfile(pwd(),'..','Images_TimeSeries_files/ImagesTStxt',sprintf('image-%i.txt',t)));
+    % noise from this smoothing
+    NoiseTS(:,:,t) = imgraw - imgsm;
+end
+
+% estimating the autocorrelation function of the pixel time series
+acfsTS = zeros(512,512,21);
+vMeanACF = zeros(21,1);  % mean of autocorrelation functions
+for ii=1:512
+    for jj=1:512
+        acfsTS(ii,jj,:) = autocorr(NoiseTS(ii,jj,:));
+        vMeanACF = vMeanACF + squeeze(acfsTS(ii,jj,:));
+    end
+    if mod(round(100*ii/512),20)==0;fprintf('%d%%,',round(100*ii/512));end
+end
+vMeanACF = vMeanACF./(512*512);
+
+% ploting some autocorrelation functions together with the mean in a
+% different color
+plot(squeeze(acfsTS(1,1,:)),'b')
+ylim([-.6 1])
+hold on
+tic
+for ii=round(linspace(1,512,50))
+    for jj=round(linspace(1,512,50))
+        plot(squeeze(acfsTS(ii,jj,:)),'b')
+    end
+end
+toc
+plot(vMeanACF,'r','LineWidth',2)
 
 
