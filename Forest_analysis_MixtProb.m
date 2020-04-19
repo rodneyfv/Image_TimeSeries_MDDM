@@ -54,14 +54,6 @@ for ii=1:n
 end
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Here we test the idea of estimating the dimension of the subspace
-% generating the density time series of wavelet coefficients, then using
-% the densities estimated with the eigenfunctions and the dimension chosen
-% to obtain residuals, which are employed to obtain a bootstrap
-% distribution of the Hellinger distance under H0.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % computing the mean image
 img_mean = zeros(length(idx), length(idy));
 for t=1:5:86
@@ -160,8 +152,8 @@ wprec = 30; % number of Daubechies-Lagarias steps
 % We consider as the time of observation a grid of points in the unit
 % interval
 x = (1:n)/n; 
-rawest = 'wavcoefint';
-estimator = 'LocLinReg';
+rawest = 'wavcoef';
+estimator = 'Efromovich';
 
 % estimating the mixture function for approximation loadings
 tmp = zeros(sum(dim_A), n);
@@ -182,11 +174,11 @@ for jj=1:J
     for ii=1:vdim_H(jj)
         tmp(cont,:) = mixtureProbs(cLoadings_H{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
         cont = cont + 1;
-    end    
+    end
     for ii=1:vdim_V(jj)
         tmp(cont,:) = mixtureProbs(cLoadings_V{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
         cont = cont + 1;
-    end    
+    end
     for ii=1:vdim_D(jj)
         tmp(cont,:) = mixtureProbs(cLoadings_D{jj}(:,ii), x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
     end
@@ -325,4 +317,99 @@ end
 % close the writer object
 close(writer_im);
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Here we apply the method of Montoril et al (2019) for the unidimensional
+% time series of loadings estimated above. Before applying it, we use a
+% k-means algorithm to separate the observations in two groups, which are
+% used to compute the different means necessary to apply Montoril's idea.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% obtaining the wavelet coefficients of the eigenfunctions and their
+% respective loadings
+cEigFunc_H = {}; cLoadings_H = {};
+cEigFunc_V = {}; cLoadings_V = {};
+cEigFunc_D = {}; cLoadings_D = {};
+[ ~, cEigFunc_A, cLoadings_A ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_A,[n_dec n]), p, Nboot, alpha, dim_A);
+for jj=1:J
+    [ ~, cEigFunc_H{jj}, cLoadings_H{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_H(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_H(jj));
+    [ ~, cEigFunc_V{jj}, cLoadings_V{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_V(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_V(jj));
+    [ ~, cEigFunc_D{jj}, cLoadings_D{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_D(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_D(jj));
+end
+
+% stacking the loadings in a single matrix
+mLoadings = zeros(dim_A + sum(vdim_H + vdim_V + vdim_D),n);
+tmp = dim_A;
+mLoadings(1:tmp,:) = cLoadings_A';
+tmp = tmp + 1;
+for jj=1:J
+    for ii=1:vdim_H(jj)
+        mLoadings(tmp,:) = cLoadings_H{jj}(:,ii);
+        tmp = tmp + 1;
+    end
+    for ii=1:vdim_V(jj)
+        mLoadings(tmp,:) = cLoadings_V{jj}(:,ii);
+        tmp = tmp + 1;
+    end
+    for ii=1:vdim_D(jj)
+        mLoadings(tmp,:) = cLoadings_D{jj}(:,ii);
+        tmp = tmp + 1;
+    end
+end
+% applying the k-means to separate each of the n observations in two groups
+vMixtIdx = kmeans(mLoadings',2);
+vMixtIdx = vMixtIdx - 1;
+
+% Arguments
+s = 1; % Value used to define the intervals
+delt = 1e-4; % Length of the sub-intervals in the Trapezoidal rule.
+min_pts = 2; % min_pts corresponds to the minimum number of sub-interval less one in the Trapezoidal rule.
+wJ = ceil(.75*log2(n)); % Considering the resolution level 6
+wfilt = [0.027333068345164, 0.029519490926073,-0.039134249302583,...
+         0.199397533976996, 0.723407690403808, 0.633978963456949,...
+         0.016602105764424,-0.175328089908107,-0.021101834024930,...
+         0.019538882735387]; %Daubechies Least Asymmetric 10-tap wavelet filter called wfilter
+wprec = 30; % number of Daubechies-Lagarias steps
+
+% We consider as the time of observation a grid of points in the unit
+% interval
+x = (1:n)/n; 
+rawest = 'wavcoef';
+estimator = 'Efromovich';
+
+% estimating the mixture function for approximation loadings
+tmp = zeros(sum(dim_A), n);
+cont = 1;
+for ii=1:dim_A
+    tmp(cont,:) = mixtureProbs_group(normalize(cLoadings_A(:,ii)),vMixtIdx, x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
+    cont = cont + 1;
+end
+% mean mixture function estimated
+vMixtureProbs_A = mean(tmp,1);
+
+% estimating the mixture function for detail loadings separately for each
+% detail level
+mMixtureProbs_details = zeros(J,n);
+for jj=1:J
+    tmp = zeros(sum(vdim_H(jj) + vdim_V(jj) + vdim_D(jj)), n);
+    cont = 1;
+    for ii=1:vdim_H(jj)
+        tmp(cont,:) = mixtureProbs_group(normalize(cLoadings_H{jj}(:,ii)),vMixtIdx, x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
+        cont = cont + 1;
+    end
+    for ii=1:vdim_V(jj)
+        tmp(cont,:) = mixtureProbs_group(normalize(cLoadings_V{jj}(:,ii)),vMixtIdx, x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
+        cont = cont + 1;
+    end
+    for ii=1:vdim_D(jj)
+        tmp(cont,:) = mixtureProbs_group(normalize(cLoadings_D{jj}(:,ii)),vMixtIdx, x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
+    end
+    mMixtureProbs_details(jj,:) = mean(tmp,1);
+end
+
+% plot of the mean mixture function of loadings corresponding to
+% approximation and detail coefficients
+vMeanMixtureFunc = mean([vMixtureProbs_A; mMixtureProbs_details(1,:)],1);
+plot(1:n,vMeanMixtureFunc)
+xlabel('t')
+ylabel('\rho(t)')
 
