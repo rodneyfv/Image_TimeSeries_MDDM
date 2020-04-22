@@ -1,6 +1,7 @@
 function [ fHat ] = mixtureProbs(y, x, s, delt, min_pts, wJ, wfilt, wprec, rawest, estimator)
 %
 % Description
+% 
 % This function is used to apply the method of Montoril et al (2019) in the
 % vector y.
 %

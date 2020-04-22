@@ -110,8 +110,8 @@ Xdec_hat_H = zeros(n_dec,J,n);
 Xdec_hat_V = zeros(n_dec,J,n);
 Xdec_hat_D = zeros(n_dec,J,n);
 
+% wavelet coefficients of estimated densities
 for jj=1:J
-    % estimated density
     Xdec_hat_H(:,jj,:) = estimated_functions_Dim( reshape(Xdec_H(:,jj,:),[npts n]), p, vdim_H(jj) );
     Xdec_hat_V(:,jj,:) = estimated_functions_Dim( reshape(Xdec_V(:,jj,:),[npts n]), p, vdim_V(jj) );
     Xdec_hat_D(:,jj,:) = estimated_functions_Dim( reshape(Xdec_D(:,jj,:),[npts n]), p, vdim_D(jj) );
@@ -131,11 +131,11 @@ Xdec_hat_A = estimated_functions_Dim( reshape(Xdec_A,[npts n]), p, dim_A );
 cEigFunc_H = {}; cLoadings_H = {};
 cEigFunc_V = {}; cLoadings_V = {};
 cEigFunc_D = {}; cLoadings_D = {};
-[ ~, cEigFunc_A, cLoadings_A ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_A,[n_dec n]), p, Nboot, alpha, dim_A);
+[ ~, cEigFunc_A, cLoadings_A ] = Estim_Dim_Pval( reshape(Xdec_hat_A,[n_dec n]), p, Nboot, alpha, dim_A);
 for jj=1:J
-    [ ~, cEigFunc_H{jj}, cLoadings_H{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_H(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_H(jj));
-    [ ~, cEigFunc_V{jj}, cLoadings_V{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_V(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_V(jj));
-    [ ~, cEigFunc_D{jj}, cLoadings_D{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_D(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_D(jj));
+    [ ~, cEigFunc_H{jj}, cLoadings_H{jj} ] = Estim_Dim_Pval( reshape(Xdec_hat_H(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_H(jj));
+    [ ~, cEigFunc_V{jj}, cLoadings_V{jj} ] = Estim_Dim_Pval( reshape(Xdec_hat_V(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_V(jj));
+    [ ~, cEigFunc_D{jj}, cLoadings_D{jj} ] = Estim_Dim_Pval( reshape(Xdec_hat_D(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_D(jj));
 end
 
 % Arguments
@@ -329,11 +329,11 @@ close(writer_im);
 cEigFunc_H = {}; cLoadings_H = {};
 cEigFunc_V = {}; cLoadings_V = {};
 cEigFunc_D = {}; cLoadings_D = {};
-[ ~, cEigFunc_A, cLoadings_A ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_A,[n_dec n]), p, Nboot, alpha, dim_A);
+[ ~, cEigFunc_A, cLoadings_A ] = Estim_Dim_Pval( reshape(Xdec_hat_A,[n_dec n]), p, Nboot, alpha, dim_A);
 for jj=1:J
-    [ ~, cEigFunc_H{jj}, cLoadings_H{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_H(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_H(jj));
-    [ ~, cEigFunc_V{jj}, cLoadings_V{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_V(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_V(jj));
-    [ ~, cEigFunc_D{jj}, cLoadings_D{jj} ] = Estim_Dim_Pval_0mean( reshape(Xdec_hat_D(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_D(jj));
+    [ ~, cEigFunc_H{jj}, cLoadings_H{jj} ] = Estim_Dim_Pval( reshape(Xdec_hat_H(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_H(jj));
+    [ ~, cEigFunc_V{jj}, cLoadings_V{jj} ] = Estim_Dim_Pval( reshape(Xdec_hat_V(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_V(jj));
+    [ ~, cEigFunc_D{jj}, cLoadings_D{jj} ] = Estim_Dim_Pval( reshape(Xdec_hat_D(:,jj,:),[n_dec n]), p, Nboot, alpha, vdim_D(jj));
 end
 
 % stacking the loadings in a single matrix
@@ -355,7 +355,8 @@ for jj=1:J
         tmp = tmp + 1;
     end
 end
-% applying the k-means to separate each of the n observations in two groups
+% Applying the k-means to separate each of the n observations in two
+% groups. Observations have to be on the rows.
 vMixtIdx = kmeans(mLoadings',2);
 vMixtIdx = vMixtIdx - 1;
 
@@ -412,4 +413,100 @@ vMeanMixtureFunc = mean([vMixtureProbs_A; mMixtureProbs_details(1,:)],1);
 plot(1:n,vMeanMixtureFunc)
 xlabel('t')
 ylabel('\rho(t)')
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% In this part we compute the density functions without performing the
+% dimension estimation. Then, the means of the random variables
+% corresponding to these functions are computed and used in the method of
+% Montoril et al (2019).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+X_hat_A = zeros(npts,n);
+X_hat_H = zeros(npts,J,n);
+X_hat_V = zeros(npts,J,n);
+X_hat_D = zeros(npts,J,n);
+
+parfor t=1:n
+    %SatImages = matfile('/media/rodney/Arquivos/Datasets/Abdou_87_Sattelite_Images/xSpatial_ySpatial_VH_VV_Time.mat');
+    % changing the current boundary to periodic.
+    dwtmode('per','nodisp');
+    % Normalizing the log-images before performing the thresholding
+    mS = log(SatImages.data(idx,idy,1,t) + 1) - log(img_mean + 1);
+    [X_hat_A(:,t), X_hat_H(:,:,t), X_hat_V(:,:,t), X_hat_D(:,:,t)] = FullDecompImageTS( mS, J, wname, npts, j1 );
+end
+
+% points where the density function of approximation and detail
+% coefficients were evaluated during the binning. Check the function
+% FullDecompImageTS
+vpts_approx = linspace(-5,40,npts);
+vpts_detail = linspace(-0.5,0.5,npts);
+
+% computing the mean of random variables associated to the density
+% functions of the 2D-DWT coefficients
+mean_A = zeros(n,1);
+mean_H = zeros(n,J);
+mean_V = zeros(n,J);
+mean_D = zeros(n,J);
+for t=1:n
+    mean_A(t) = sum(vpts_approx'.*X_hat_A(:,t))*(vpts_approx(2) - vpts_approx(1));
+    for jj=1:J
+        mean_H(t,jj) = sum(vpts_detail'.*X_hat_H(:,jj,t))*(vpts_detail(2) - vpts_detail(1));
+        mean_V(t,jj) = sum(vpts_detail'.*X_hat_V(:,jj,t))*(vpts_detail(2) - vpts_detail(1));
+        mean_D(t,jj) = sum(vpts_detail'.*X_hat_D(:,jj,t))*(vpts_detail(2) - vpts_detail(1));
+    end
+end
+
+% Applying the k-means to separate each of the n observations in two
+% groups. Observations have to be on the rows.
+vMixtIdx = kmeans([mean_A, mean_H, mean_V, mean_D],2);
+vMixtIdx = vMixtIdx - 1;
+
+% Arguments
+s = 1; % Value used to define the intervals
+delt = 1e-4; % Length of the sub-intervals in the Trapezoidal rule.
+min_pts = 2; % min_pts corresponds to the minimum number of sub-interval less one in the Trapezoidal rule.
+wJ = ceil(.75*log2(n)); % Considering the resolution level 6
+wfilt = [0.027333068345164, 0.029519490926073,-0.039134249302583,...
+         0.199397533976996, 0.723407690403808, 0.633978963456949,...
+         0.016602105764424,-0.175328089908107,-0.021101834024930,...
+         0.019538882735387]; %Daubechies Least Asymmetric 10-tap wavelet filter called wfilter
+wprec = 30; % number of Daubechies-Lagarias steps
+
+% We consider as the time of observation a grid of points in the unit
+% interval
+x = (1:n)/n; 
+rawest = 'wavcoef';
+estimator = 'Efromovich';
+
+% estimating the mixture function for approximation means
+vMixtureProbs_A = mixtureProbs_group(mean_A,vMixtIdx, x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
+
+% estimating the mixture function for detail mean separately for each
+% detail level
+mMixtureProbs_details = zeros(J,n);
+for jj=1:J
+    tmp = zeros(3,n);
+    tmp(1,:) = mixtureProbs_group(mean_H(:,jj),vMixtIdx, x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
+    tmp(2,:) = mixtureProbs_group(mean_V(:,jj),vMixtIdx, x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
+    tmp(3,:) = mixtureProbs_group(mean_D(:,jj),vMixtIdx, x, s, delt, min_pts, wJ, wfilt, wprec,rawest,estimator);
+    mMixtureProbs_details(jj,:) = mean(tmp,1);
+end
+
+% plot of the mean mixture function of loadings corresponding to
+% approximation and detail coefficients
+vMeanMixtureFunc = mean([vMixtureProbs_A'; mMixtureProbs_details],1);
+plot(1:n,vMeanMixtureFunc)
+xlabel('t')
+ylabel('\rho(t)')
+
+% plotting the mean mixture function with the maxima and minima observed
+% for each observation
+vMeanMax = max([vMixtureProbs_A'; mMixtureProbs_details],[],1);
+vMeanMin = min([vMixtureProbs_A'; mMixtureProbs_details],[],1);
+plot(1:n,vMeanMixtureFunc)
+hold on
+plot(1:n,vMeanMax)
+plot(1:n,vMeanMin)
+
 

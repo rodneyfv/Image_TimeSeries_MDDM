@@ -30,11 +30,6 @@ function [ fHat ] = mixtureProbs_group(y, yg, x, s, delt, min_pts, wJ, wfilt, wp
 % estimates of the mean in the two groups separated above
 muG = mean(y(yg==1));
 muL = mean(y(yg==0));
-if(muG < muL) % making sure muG is the largest mean
-    tmp = muG;
-    muG = muL;
-    muL = tmp;
-end
 
 % Applying the transformation to take the problem to a regression context
 w = (y - muL)/(muG - muL);

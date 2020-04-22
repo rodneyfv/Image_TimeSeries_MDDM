@@ -1,4 +1,4 @@
-function [ xdec_A, xdec_H, xdec_V, xdec_D, L1 ] = FullDecompImageTS_wavedec2( img_obs, J, wname, npts, j1 )
+function [ x_A, x_H, x_V, x_D ] = FullDecompImageTS( img_obs, J, wname, npts, j1 )
 %
 % Description
 % 
@@ -6,7 +6,7 @@ function [ xdec_A, xdec_H, xdec_V, xdec_D, L1 ] = FullDecompImageTS_wavedec2( im
 % image img_obs if performed; a 2D-DWT decomposition is performed with J
 % levels; for each kind of detail (approximation, horizontal, vertical,
 % diagonal) coefficient, a density function of the coefficients is
-% estimated through binning; a 1D-DWT wavelet decomposition of the values
+% estimated through binning; a 1D-DWT wavelet denoising of the values
 % of this density is performed and returned in the function output.
 % Pay attention that values where binned is performed is different for
 % approximation coefficients than the other detail coefficients.
@@ -21,13 +21,11 @@ function [ xdec_A, xdec_H, xdec_V, xdec_D, L1 ] = FullDecompImageTS_wavedec2( im
 %           estimate of the density
 % 
 % Outputs
-% xdec_A    - denoised wavelet coefficients of the estimated density for the
-%           coefficients of the approximation level of the image 2D-DWT decomposition
-% xdec_H    - ... of the horizontal details of the image 2D-DWT decomposition
-% xdec_V    - ... of the vertical details of the image 2D-DWT decomposition
-% xdec_D    - ... of the diagonal details of the image 2D-DWT decomposition
-% L1        - bookkeeping vector of the 1D-DWT of the binning estimate of the 
-%           density
+% x_A    - denoised binning density estimate for the coefficients of the 
+%       approximation level of the image 2D-DWT decomposition
+% x_H    - ... of the horizontal details of the image 2D-DWT decomposition
+% x_V    - ... of the vertical details of the image 2D-DWT decomposition
+% x_D    - ... of the diagonal details of the image 2D-DWT decomposition
 
 % changing the current boundary to periodic.
 dwtmode('per','nodisp');
@@ -59,31 +57,27 @@ vpts = linspace(-0.5,0.5,npts);
 % window length used in the binning
 wind = (vpts(npts) - vpts(1))/sqrt(npts);
 
-% getting the number of coefficients that we'll get on the 1D-DWT in order
-% to create the xdec matrices
-[~,C1,~] = wden(ones(npts,1),'sqtwolog','s','sln',j1,wname);
-n_dec = length(C1);
-xdec_H = zeros(n_dec,J);
-xdec_V = zeros(n_dec,J);
-xdec_D = zeros(n_dec,J);
+x_H = zeros(npts,J);
+x_V = zeros(npts,J);
+x_D = zeros(npts,J);
 
 for jj=1:J
     % vectorizing the horizontal detail coefficients stored in cellH
     % binning, which gives a pre-estimate of the square-root of the densities
     bin1 = sqrt(binning(cellH{jj},vpts,wind));
     % wavelet decomposition and denoising of the binned data
-    [~,C1,~] = wden(bin1,'sqtwolog','s','sln',j1,wname);
-    xdec_H(:,jj) = C1/sqrt(sum(C1.^2)*(vpts(2)-vpts(1)));
+    [x1,~,~] = wden(bin1,'sqtwolog','s','sln',j1,wname);
+    x_H(:,jj) = x1/sqrt(sum(x1.^2)*(vpts(2)-vpts(1)));
 
     % performing the same for vertical detail coefficients
     bin1 = sqrt(binning(cellV{jj},vpts,wind));
-    [~,C1,~] = wden(bin1,'sqtwolog','s','sln',j1,wname);
-    xdec_V(:,jj) = C1/sqrt(sum(C1.^2)*(vpts(2)-vpts(1)));
+    [x1,~,~] = wden(bin1,'sqtwolog','s','sln',j1,wname);
+    x_V(:,jj) = x1/sqrt(sum(x1.^2)*(vpts(2)-vpts(1)));
 
     % performing the same for diagonal detail coefficients
     bin1 = sqrt(binning(cellD{jj},vpts,wind));
-    [~,C1,L1] = wden(bin1,'sqtwolog','s','sln',j1,wname);
-    xdec_D(:,jj) = C1/sqrt(sum(C1.^2)*(vpts(2)-vpts(1)));    
+    [x1,~,~] = wden(bin1,'sqtwolog','s','sln',j1,wname);
+    x_D(:,jj) = x1/sqrt(sum(x1.^2)*(vpts(2)-vpts(1)));    
 end
 % using different points of binning for approx. coeff. density
 vpts = linspace(-5,40,npts);
@@ -91,8 +85,8 @@ vpts = linspace(-5,40,npts);
 wind = (vpts(npts) - vpts(1))/sqrt(npts);
 % performing the same for approximation coefficients
 bin1 = sqrt(binning(cellA,vpts,wind));
-[~,C1,~] = wden(bin1,'sqtwolog','s','sln',j1,wname);
-xdec_A = C1/sqrt(sum(C1.^2)*(vpts(2)-vpts(1)));
+[x1,~,~] = wden(bin1,'sqtwolog','s','sln',j1,wname);
+x_A = x1/sqrt(sum(x1.^2)*(vpts(2)-vpts(1)));
 
 
 end

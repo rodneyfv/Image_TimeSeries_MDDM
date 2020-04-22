@@ -1,7 +1,18 @@
 function [ mY ] = estimated_functions_Dim( Xdec, p, d )
+% 
+% Description
+% 
 % this function receives a matrix Xdec with wavelet coefficients and using
 % a lag of p, it returns the coefficients mY of a estimated process of
 % dimension d.
+% 
+% Inputs
+% Xdec  - matrix of wavelet coefficients of the curves
+% p     - lag used to perform the dimension estimation
+% d     - dimension of the function time series
+% 
+% Outputs
+% mY       - function time series estimate using the dimension d
 
 [~, n] = size(Xdec);
 % vector with mean of the coefficients along time

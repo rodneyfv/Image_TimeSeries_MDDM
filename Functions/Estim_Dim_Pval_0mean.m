@@ -1,13 +1,26 @@
 function [ vDimSel, mEigFunc_dec, mLoadings ] = Estim_Dim_Pval_0mean( Xdec, p, Nboot, alpha, d0)
-% in this function we test the dimension of curves time series using the
-% method of Fonseca and Pinheiro (2019). The function receives a matrix of
-% wavelet coefficients of the curves, a lag p and performs bootstrap tests
-% with Nboot replications and significance level alpha. Here, we assume a
-% a zero mean process was received, hence, the mean vector of the 
-% coefficients is not subtracted, as happens in 'Estim_Dim_Pval.m'. The 
-% function returns the selected dimension vDimSel, the p-values obtained in the
-% bootstrap tests and a vector with eigenvalues associanted to the
-% eigenfunctions.
+% 
+% Description
+% 
+% in this function we estimate the dimension of curves time series using the
+% method of Fonseca and Pinheiro (2019). If some dimension d0 is provided,
+% the function just computes wavelet cofficients of eigenfunctions and
+% corresponding loadings. The functions must already have ZERO MEAN.
+% 
+% Inputs
+% Xdec  - matrix of wavelet coefficients of the curves, which should have
+%       zero mean
+% p     - lag used to perform the dimension estimation
+% Nboot - number of bootstrap replications used in the eigenvalue
+%       resampling
+% alpha - significance level used in the bootstrap test of eigenvalues
+% d0    - if not passaded through arguments, the function estimates the
+%       process dimension, otherwise, it just uses the value d0 passed in it
+% 
+% Outputs
+% vDimSel       - the estimated dimension (equal to d0 when it is passed)
+% mEigFunc_dec  - matrix with wavelet coefficients of the estimated eigenfunctions
+% mLoadings     - matrix of loadings related to eigenfunctions
 
 [~, n] = size(Xdec);
 
